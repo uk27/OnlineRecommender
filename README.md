@@ -106,7 +106,7 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 
 2. Click on EMR 
 
-![Alt text](/images/EMR.png?raw=true&width=100 "EMR")
+![Alt text](/images/EMR.png?raw=true&width=50 "EMR")
 
 3. Create a cluster:
 
