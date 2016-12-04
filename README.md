@@ -185,3 +185,4 @@ def doSomething():
 
 Code Description
 
+![Alt text](/images/EMR.png?raw=true "Optional title")
