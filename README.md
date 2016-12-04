@@ -106,7 +106,7 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 
 2. Click on EMR 
 
-![Alt text](/images/EMR.png?raw=true "EMR")
+![Alt text](/images/EMR.png?raw=true&width=100 "EMR")
 
 3. Create a cluster:
 
@@ -136,13 +136,15 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 ![Alt text](/images/Terminal.png?raw=true "ssh")
 
 5. Install additional software on the cluster. For this tutorial we will need:
+
 * Git : Source Version Control
 * CherryPy : A microframework in Python that exposes REST services. We use this to create our server.
 * Paste :  Logging Tool
 * Flask: Another REST enabling microframework in Python. We use it to bind services with the urls.
 
-``` 
 Use the following commands :
+
+``` 
 sudo  yum install git
 sudo pip install cherrypy
 sudo pip install paste
