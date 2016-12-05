@@ -106,124 +106,144 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 
 2. Click on EMR 
 
-![Alt text](/images/EMR.png?raw=true&width=50 "EMR")
+
+  <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/EMR.png" alt="alt text" width="700" height="250">
+
 
 3. Create a cluster:
 
-* Enter name of your cluster
-* Select the S3 folder for logs. <Link to how to create a bucket> 
+  1. Enter name of your cluster
 
-![Alt text](/images/create_cluster_1.png?raw=true "cc1")
+  2. Select the S3 folder for logs. <Link to how to create a bucket> 
 
-* Choose the suite of Applications that installs Spark. 
 
-![Alt text](/images/create_cluster_2.png?raw=true "cc2")
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/create_cluster_1.png" alt="alt text" width="800" height="250" >
 
-* In the Security and Access tab, choose your key pair from the drop down.
 
-![Alt text](/images/create_cluster_2.png?raw=true "cc3")
+  3. Choose the suite of Applications that installs Spark.
 
-* Leave the default value for everything else.
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/create_cluster_2.png" alt="alt text" width="700" height="250" >
+
+  4. In the Security and Access tab, choose your key pair from the drop down.
+
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/create_cluster_3.png" alt="alt text" width="800" height="300" >
+
+  5. Leave the default value for everything else.
 
 4. Open an ssh connection from the command line. For this: 
 
-* Click on the ssh on your cluster dashboard to find the command for the terminal. 
+  1. Click on the ssh on your cluster dashboard to find the command for the terminal. 
 
-![Alt text](/images/ssh.png?raw=true "ssh")
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/ssh.png" alt="alt text" width="600" height="200" >
 
-* Open an ssh connection with the cluster using your terminal. Please make sure you navigate to the folder that contains your key before running this command. 
+  2. Open an ssh connection with the cluster using your terminal. Please make sure you navigate to the folder that contains your key before running this command. 
 
-![Alt text](/images/Terminal.png?raw=true "ssh")
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/Terminal.png" alt="alt text" width="600" height="300" >
+
 
 5. Install additional software on the cluster. For this tutorial we will need:
 
-* Git : Source Version Control
-* CherryPy : A microframework in Python that exposes REST services. We use this to create our server.
-* Paste :  Logging Tool
-* Flask: Another REST enabling microframework in Python. We use it to bind services with the urls.
+  * Git : Source Version Control
+  * CherryPy : A microframework in Python that exposes REST services. We use this to create our server.
+  * Paste :  Logging Tool
+  * Flask: Another REST enabling microframework in Python. We use it to bind services with the urls.
 
-Use the following commands :
+  Use the following commands :
 
-``` 
-sudo  yum install git
-sudo pip install cherrypy
-sudo pip install paste
-sudo pip install flask
-```
+  ``` 
+  sudo yum install git
+  sudo pip install cherrypy
+  sudo pip install paste
+  sudo pip install flask
+  ```
 
 6. Get the recommender code by cloning the repository. Clone the code by using:
 
-``` 
-git clone https://github.com/uk27/OnlineRecommender.git
-```
+  ``` 
+  git clone https://github.com/uk27/OnlineRecommender.git
+  ```
   
-This will create a folder called OnlineRecommender that will contain four files: 
+  This will create a folder called OnlineRecommender that will contain four files: 
 
-* engine.py : This contains the logic for collaborative filtering using Mlib
-* app.py :  This contains the logic for routing the web requests and calling appropriate functions. This is essentialy where the flask logic is.
-* server.py : This is where we configure and initialize the spark context, give the host and port of the service start the app.  By default it uses 5432 as port number.
-* user_rating.file : This contains the ratings information for a new user that we will be adding to the existing set.
+  * engine.py : This contains the logic for collaborative filtering using Mlib
+  * app.py :  This contains the logic for routing the web requests and calling appropriate functions. This is essentialy where the flask logic is.
+  * server.py : This is where we configure and initialize the spark context, give the host and port of the service start the app.  By default it uses 5432 as port number.
+  * user_rating.file : This contains the ratings information for a new user that we will be adding to the existing set.
 
 7. Navigate into the directory containing the source code 
 
-```
-cd OnlineRecommender/src
-```
+  ```
+  cd OnlineRecommender/src
+  ```
 
 8. Run the server by typing in the code:
 
-```
-spark-submit server.py
-``` 
-This essentially runs the server.py which initializes SparkContext, trains our recommender and starts listening on the port 5432.
+  ```
+  spark-submit server.py
+  ``` 
+  This essentially runs the server.py which initializes SparkContext, trains our recommender and starts listening on the port 5432.
 
 9. We need to tell EC2 that it needs to accept the requests on the port 5432 and route it to the master node. For this:
 
-* Go to EC2. 
-* Under Networks and Security choose Security groups 
+  1. Go to EC2. 
+  2. Under Networks and Security choose Security groups 
 
-![Alt text](/images/SecurityGroup.png?raw=true "ssh")
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/SecurityGroup.png" alt="alt text" width="700" height="200" >
 
-* Select the master node from the list
 
-* Add a new rule as illustrated shown below.  We select Custom TCP rule, type '5432' for port number and  select source as 'Anywhere' from the drop down.
+  3. Select the master node from the list
 
-![Alt text](/images/editInbound.png?raw=true "ssh")
-![Alt text](/images/AddRule.png?raw=true "ssh")
+  4. In the inbound tab, select edit.
 
-Note: The port number entered here needs to be same as the port number in server.py
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/editInbound.png" alt="alt text" width="800" height="300" >
+
+  5. Click on add a new rule. Select TCP rule, type '5432' for port number and  select source as 'Anywhere' from the drop down.
+
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/Addrule.png" alt="alt text" width="800" height="150" >
+
+  Note: The port number entered here needs to be same as the port number in server.py
 
 10. Now the only thing that we need to access the service from a web browser is the public ip address of the master node. EMR by default assigns a public ip to each instance in the cluster unless otherwise specified. This can be found as follows:
-* Go to EC2 and click on instances.
 
-![Alt text](/images/Instances.png?raw=true "ssh") 
+  1. Go to EC2 and click on instances.
 
-* In the tab that appears, scroll to the right to find the public ip.
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/Instances.png" alt="alt text" width="700" height="250" >
 
-![Alt text](/images/publicip.png?raw=true "ssh")
+
+  2. In the tab that appears, scroll to the right to find the public ip.
+
+    <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/publicip.png" alt="alt text" width="800" height="100" >
+
     
 11. That’s it! We can start using the service now. In your browser paste any of the following:
-  
-* http://<Public-IP-Address-Of-The-Master>:5432/1/ratings/top/10
-    
-This will retrieve the top ten ratings for the user number 1.
-    
-* http://<Public-IP-Address-Of-The-Master>:5432/1/ratings/500
-    
-This will retrieve the rating for the movie 'The Quiz' for user 1.
-    
-* We can also add a new user to the existing datatset set by associating a set of ratings with a new user number. To do this, we use the command line as we need to pass the list of movies to the our engine.
 
-```   
-curl --data-binary @user_ratings.file http://<Public-IP-Address-Of-The-Master>:5432/0/ratings
-```
+  * Retrieve the top ten ratings for the user number 1.
+  
+    ``` 
+    http://<Public-IP-Address-Of-The-Master>:5432/1/ratings/top/10
+    ```
+    
+  * Retrieve the rating for the movie 'The Quiz' for user 1.
+    
+    ```
+    http://<Public-IP-Address-Of-The-Master>:5432/1/ratings/500
+    ```
+    
+    
+  * We can also add a new user to the existing datatset set by associating a set of ratings with a new user number. To do this, we use the command line as we need to pass the list of movies to the our engine.
+
+    ```   
+    curl --data-binary @user_ratings.file http://<Public-IP-Address-Of-The-Master>:5432/0/ratings
+    ```
     
 12. After playing with your new web-service, remember to terminate the cluster.
 
-![Alt text](/images/Terminate?raw=true "ssh")
+  <img src="https://github.com/uk27/OnlineRecommender/blob/master/images/Terminate.png" alt="alt text" width="700" height="200" >
+
     
-  
-    
+
+## 2  Second Tutorial
+> Problem Statement
 
 ## 2  Second Tutorial
 > Problem Statement
@@ -309,4 +329,3 @@ def doSomething():
 
 Code Description
 
-![Alt text](/images/EMR.png?raw=true "Optional title")
