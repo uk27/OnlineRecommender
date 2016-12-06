@@ -100,7 +100,7 @@ For a detailed implementation please look at the server.py file.
  
 ### 1.3 The Engine as a service hosted on AWS
 
-Hosting the service on AWS might appear to be a complicated process if you are doing it for the first time. However, if you closely follow the steps below, you can be up and running in a matter of minutes! Let's see how this done.
+Hosting the service on AWS might appear to be a complicated process if you are doing it for the first time. However, if you closely follow the steps below, you can be up and running in a matter of minutes! Let's see how it's done.
 
 1. Log on to AWS console
 
@@ -287,45 +287,247 @@ def doSomething():
 
 Code Description
 
-## 3  Third Tutorial
-> Problem Statement
+## 3  Third Tutorial: Guassian Mixture Modeling
+> The purpose of this tutorial is to use Spark to identify "hidden" distributions that make up the overall distribution of data present. Gaussian Mixture Modeling is a process quite similar to k-means clustering in that it produces random parameter estimates of a given number of underlying normal distributions that comprise the distribution of the data observed.
 
-Some Description
+ Gaussian Mixture Modeling relies on a method called Expectation Maximization. In effect, this algorithm assumes each data point is a linear combination of multivariate Guassian distributions. Like with k-means, it is an iterative algorithm that stops once it reaches a "best" solution, though that solution may not be globally the "best". The basic idea is we have M clusters and points in that cluster follow a normal distribution. 
 
-### 3.1 Subsection Topic
-
-Description comes here.
+ If you are familiar with k-means, this algorithm is not a huge step. Instead of using hard assignments to clusters, we now use soft assignment, where each point has a probability of belonging to a particular cluster. As with most algorithms, there are some key assumptions that must be met. First, the dataset should be Gaussian. What happens when this assumption is not met? If the number of clusters is known in advance, the algorithm is not guaranteed to find the "right" clusters. If the number of clusters is unknown, this actually is a bit better! If those clusters have a normal distribution then an information criterion is typically good enough to find the best solution. Second, the cluster sizes must be relatively close to each other. If the clusters are not the same size, a larger cluster will show up as more important than any smaller cluster.
 
 
-###### Figure 5: Code for XX
+### 3.1 Introduction to GMM Using Spark
+
+SparkMLLib contains a number of powerful methods for implementing algorithms that use Expectation Maximization, both for k-means and Gaussian Mixture Modeling. The following example builds on an example dataset provided by Spark and saved for you as "gmm_data.txt". 
+
+It is important to know there are key parameters in control of the user. The SparkMLLib documentation identifies them as follows:
+
+- **k** is the number of desired clusters.
+- **convergenceTol** is the maximum change in log-likelihood at which we consider convergence achieved.
+- **maxIterations** is the maximum number of iterations to perform without reaching convergence.
+- **initialModel** is an optional starting point from which to start the EM algorithm. If this parameter is omitted, a random starting point will be constructed from the data.
+
+The following code assumes you are working on AWS. Please refer to the directions for AWS provided in this document for submission directions to AWS. Please keep in mind you will need to have the _gmm_data.txt_ file uploaded to your S3 bucket for this work.
+
+We first import the necessary functions. These include a print function for displaying the Spark results in a reasonable format on AWS, an operating system import function, a Spark Context and the Guassian Mixture Model functions appropriate for pyspark. Please note that if you would like to complete these in Scala, the documentation is available on the SparkMLLib online reference guide.
+
+```Python
+from __future__ import print_function
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
+```
+
+In the next step, we create a configuration for Spark which allows us to create an app name here. For more information on SparkConf see this [reference]
+(https://spark.apache.org/docs/1.6.2/api/java/org/apache/spark/SparkConf.html). We also create a Spark context based on this Spark configuration which allows us to then use SparkMLLib which comes as part of the base build for Spark.
+
+
 ```Python
 
-#Python Code comes here
-def doSomething():
-  #line 1
-  #line 2
-  return 
+conf = SparkConf().setAppName("Gaussian Mixture Modeling")
+sc = SparkContext(conf=conf)
 
 ```
 
-Code Description
+The following commands demonstrate how to point to the S3 bucket in AWS, create a file path and use that file path to generate an RDD called gmmData that contains the observations in the dataset. It is worthwhile to confirm that the data was read in correctly. Feel free to call gmmData.take(5) to make sure the first five observations match what is in the file itself.
 
-
-### 3.2 Subsection Topic
-
-Description comes here.
-
-
-###### Figure 6: Code for XX
 ```Python
 
-#Python Code comes here
-def doSomething():
-  #line 1
-  #line 2
-  return 
+datasets_path = "s3a://bigdataweberproject"
+data_file = os.path.join(datasets_path,'gmm_data.txt')
+gmmData = sc.textFile(data_file)
 
 ```
 
-Code Description
+The next step ensures that the data are in the appropriate format for the Gaussian Mixture Model in Spark. The algorithm works with data of type float. The following code calls the gmmData RDD, uses map to iterate over each of its lines, and in each line, converts each object to type float. Note that the split function assumes the data is space separated, not comma separated as is often present in Spark's dataset examples.
 
+```Python
+
+formattedData = gmmData.map(lambda line: [float(x) for x in line.strip().split(' ')])
+
+```
+
+Up to this point, we have created an RDD called _formattedData_ that consists of observations from the original data in float format. The next step demonstrates the efficiency of code using SparkML, as we train the model on the formattedData RDD with the assumption that there are two underlying normal distributions. It is critical to note that the number of distributions is user specified here. This is also known as the number of desired clusters. This number often requires knowledge of the data and perhaps previous research related to similar dataset types. This returns _gmm_model_ which contains information about the clusters.
+
+```Python
+
+gmm_model = GaussianMixture.train(formattedData, 2)
+
+```
+
+With the _gmm_model_ created, we can do a number of things on the model object itself. Specifically, we can call _weights_, _gaussians_ and _gaussians.sigma_ to obtain parameters from the model. The following print call displays (for each clusters) the weights associated with the cluster, and the mean and variance parameters for the Gaussian distribution (mu and sigma, here). For ease of use, we have not output the parameter values to a text file. The values will just display in your local console connected to AWS.
+
+```Python
+
+for i in range(2):
+print("weight = ", gmm_model.weights[i], "mu = ", gmm_model.gaussians[i].mu,
+"sigma = ", gmm_model.gaussians[i].sigma.toArray())
+
+```
+
+The above code walked you through each part of the python file. Note that in AWS you will need to submit the code in aggregate. For your ease of use, the code above is collected below.
+
+```Python
+from __future__ import print_function
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
+
+datasets_path = "s3a://bigdataweberproject"
+data_file = os.path.join(datasets_path,'gmm_data.txt')
+gmmData = sc.textFile(data_file)
+
+formattedData = gmmData.map(lambda line: [float(x) for x in line.strip().split(' ')])
+
+gmm_model = GaussianMixture.train(formattedData, 2)
+
+for i in range(2):
+print("weight = ", gmm_model.weights[i], "mu = ", gmm_model.gaussians[i].mu,
+"sigma = ", gmm_model.gaussians[i].sigma.toArray())
+
+```
+
+### 3.2 Old Faithful Eruptions Using Gaussian Mixture Modeling
+
+> The following dataset comes from a set of internal data available in R. _faithful.csv_ contains observations of length of eruptions measured in minutes and time between eruptions. A simple plot of the data suggests there may be two underlying Gaussian distributions in this case. 
+
+We again import the necessary tools to carry out the Mixture Modeling. 
+
+```Python
+
+from __future__ import print_function
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
+
+```
+
+Create a configuration and context for Spark. Recall that these steps are necessary if you are working with AWS but if you are working with pyspark on a virtual machine the SparkContext may have been created for you already.
+
+```Python
+
+conf = SparkConf().setAppName("Gaussian Mixture Modeling Faithful Data")
+sc = SparkContext(conf=conf)
+
+```
+
+Point to the S3 bucket created in earlier steps as well as the demonstration that goes with the beginning of these tutorials. We create a faithfulData RDD to prepare for analysis.
+
+```Python
+
+datasets_path = "s3a://bigdataweberproject"
+data_file = os.path.join(datasets_path,'faithful.csv')
+faithfulData = sc.textFile(data_file)
+
+```
+
+>Note that the data here is comma separated which requires splitting on a different character than in the previous example. However, unlike our earlier example, we only want to retain the "waiting" observations not the eruption time in minutes. Here, we split by a different character, retain only one value from that split and ensure that value is in float format.
+
+```Python
+
+formattedFaithfulData = faithfulData.map(lambda line: [float(x) for x in line.strip().split(',')[0]])
+
+```
+
+The time between eruptions variable appears to have a multivariate distribution with two normal distributions. In other words, the _k_ parameter, which indicates the number of clusters, is two.
+
+```Python
+
+gmm_model_faithful = GaussianMixture.train(formattedFaithfulData, 2)
+
+```
+
+Lastly, we can return the model parameters as we did in the original example.
+
+```Python
+
+for i in range(2):
+print("weight = ", gmm_model_faithful.weights[i], "mu = ", gmm_model_faithful.gaussians[i].mu,
+"sigma = ", gmm_model_faithful.gaussians[i].sigma.toArray())
+
+```
+
+Putting all of this together, we have the following code:
+
+```Python
+
+from __future__ import print_function
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
+
+conf = SparkConf().setAppName("Gaussian Mixture Modeling Faithful Data")
+sc = SparkContext(conf=conf)
+
+datasets_path = "s3a://bigdataweberproject"
+data_file = os.path.join(datasets_path,'faithful.csv')
+faithfulData = sc.textFile(data_file)
+
+formattedFaithfulData = faithfulData.map(lambda line: [float(x) for x in line.strip().split(',')[0]])
+
+gmm_model_faithful = GaussianMixture.train(formattedFaithfulData, 2)
+
+for i in range(2):
+print("weight = ", gmm_model_faithful.weights[i], "mu = ", gmm_model_faithful.gaussians[i].mu,
+"sigma = ", gmm_model_faithful.gaussians[i].sigma.toArray())
+
+```
+
+### 3.3 Rainfall Data Using Gaussian Mixture Modeling
+
+> The following dataset called "snoq.csv" contains rainfall data for Snoqualmie Peak in Washington over a period of years up to 1983 and can be found [here](http://www.stat.cmu.edu/~cshalizi/402/lectures/16-glm-practicals/snoqualmie.csv). Note that one issue with the data is that it contains missing values for leap years. The dataset provided to you here has missing values removed but consider the problem of what it would require for Spark to parse missing values correctly. 
+Produce the two and three cluster solutions for this data. 
+
+Standard setup.
+
+```Python
+
+from __future__ import print_function
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
+
+conf = SparkConf().setAppName("Gaussian Mixture Modeling Faithful Data")
+sc = SparkContext(conf=conf)
+
+```
+
+Read in data.
+
+```Python
+
+datasets_path = "s3a://bigdataweberproject"
+data_file = os.path.join(datasets_path,'snoq.csv')
+rainfallData = sc.textFile(data_file)
+
+```
+
+Ensure data is in float format. It is important to note we need not split lines here as they are already provided in a single column format. 
+
+```Python
+
+formattedRainfallData = faithfulData.map(lambda x: float(x))
+
+```
+
+Produce both the two and three cluster solution. 
+
+```Python
+
+gmm_model_rainfall_2 = GaussianMixture.train(formattedRainfallData, 2)
+gmm_model_rainfall_3 = GaussianMixture.train(formattedRainfallData, 3)
+
+```
+
+Print out the model parameters for both solutions and compare. 
+
+```Python
+
+for i in range(2):
+    print("weight = ", gmm_model_rainfall_2.weights[i], "mu = ", gmm_model_rainfall_2.gaussians[i].mu,
+    "sigma = ", gmm_model_rainfall_2.gaussians[i].sigma.toArray())
+
+for i in range(2):
+    print("weight = ", gmm_model_rainfall_3.weights[i], "mu = ", gmm_model_rainfall_3.gaussians[i].mu,
+    "sigma = ", gmm_model_rainfall_3.gaussians[i].sigma.toArray())
+
+```
