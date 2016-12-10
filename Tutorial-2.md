@@ -241,16 +241,16 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 	<img src="https://github.com/uk27/OnlineRecommender/blob/master/images/Terminate.png" alt="alt text" width="700" height="200" >
 
 		
+##Classification Tutorials: Second & Third Tutorials
+This pair of tutorials will go through two separate classification systems and evaluate the model for each, comparing the results on one set of data. Classifiers take predictor variables and outcome variables specified by the user, and return a system for predicting future outcomes with those predictor variables.
 
-## Second Tutorial: Naive Bayes Model
+## First Classification Tutorial: Naive Bayes Model
 
-> Problem Statement
+Naive Bayes is the first model used in this tutorial. It is a simple technique for constructing classifiers: models that assign class labels to problem instances, represented as vectors of feature values, where the class labels are drawn from some finite set. It is not a single algorithm for training such classifiers, but a family of algorithms based on a common principle: all naive Bayes classifiers assume that the value of a particular feature is independent of the value of any other feature, given the class variable.
 
-Naive Bayes is a simple technique for constructing classifiers: models that assign class labels to problem instances, represented as vectors of feature values, where the class labels are drawn from some finite set. It is not a single algorithm for training such classifiers, but a family of algorithms based on a common principle: all naive Bayes classifiers assume that the value of a particular feature is independent of the value of any other feature, given the class variable.
-
+> Import any necessary libraries. Set spark context.
 
 ```Python
-
 #Import any necessary libraries
 import os
 from pyspark import SparkConf, SparkContext
@@ -260,8 +260,10 @@ from pyspark.mllib.regression import LabeledPoint
 from numpy import array
 conf = SparkConf().setAppName("NaiveBayes")
 sc = SparkContext(conf=conf)
-
 ```
+
+> Create paths from the S3 to call the data. The output_path is optional and can be used to write any files.
+> Replace "msbatutorial" with S3 bucket name and make sure the "boston.50.txt" is located in the data folder. Create the output folder if desired.
 
 ```Python
 
@@ -272,6 +274,8 @@ file = os.path.join(datasets_path, 'boston50.txt')
 
 ```
 
+> Create an RDD from the loaded data
+
 ```Python
 
 bostonRDD = sc.textFile(file)
@@ -279,12 +283,17 @@ bostonRDD.cache()
 
 ```
 
+> The boston file is tab delimited. For this case, replace tab delimited with comma delimited.
+
 ```Python
 
 new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
 
 ```
 
+> Define a function to take in the data. This identifies the predictor and outcome variables in the data. If using "boston.txt" as the data, the 13th column is designated as the outcome variable.
+- The function parsePoint takes in an array and creates float values for each comma separated value. Then calls the LabeledPoint function to define one point as the outcome variable.
+- parsePoint() is then called using the map function, and is applied to each row in the selected RDD
 ```Python
 
 def parsePoint(line):
@@ -295,6 +304,9 @@ parsedData = new_b.map(parsePoint)
 
 ```
 
+> Split the data into a training set and a test set. The results of the model on the training set will be tested on the test set. Then call the NaiveBayes.train() function to train the data.
+- NaiveBayes.train() allows for an optional smoothing parameter.
+- NaiveBayes.train() also allows for model type parameter. The default type is 'multinomial'. The other options are 
 ```Python
 
 # Split data approximately into training and test
@@ -305,10 +317,12 @@ model_boston = NaiveBayes.train(training_boston, 1.0)
 
 ```
 
+> Make the prediction and test the model. Then the number of correct values can be compared with the total number of values. The output will then be what percentage of outcomes in the testing data have been predicted accurrately by the model.
+
 ```Python
 
 # Make prediction and text accuracy
-# Create a new RDD each line contain a tuple of predicted lable and the original lable
+# Create a new RDD where each line contains a tuple of predicted label and the original label
 predictionAndLabel_boston = test_boston.map(lambda p: (model_boston.predict(p.features), p.label))
 
 # Make prediction and text accuracy. Count how many predicted labels are equal to the original labels divied by the number of records, then we get the accuracy rate for our prediction
@@ -316,23 +330,81 @@ accuracy_boston = 1.0 * predictionAndLabel_boston.filter(lambda(x,v): x == v).co
 
 ```
 
+> Print the model accurracy. Because of Spark's output, it is recommended to print something else that will help locate the result. The code below contains two strings of periods.
+
 ```Python
 
 # Print Model Accuracy
 print('..........................................................................................................')
 print('model accuracy: {}'.format(accuracy_boston))
-print('-----Finished NaiveBayes Model-----') #We got .74
+print('-----Finished NaiveBayes Model-----') #Original result: 0.74 or 74% accurracy
 print('..........................................................................................................')
 
 ```
 
+> This code can all be put together and saved as a .py file as well, and either run on a local machine or on a service such as Amazon Web Services. Below is the full code for naiveBayesModel.py
 
-### 3 Third Tutorial: Decision Trees Using Spark
+```Python
+
+# Import Relevant Libraries
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.classification import NaiveBayes, NaiveBayesModel
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.regression import LabeledPoint
+from numpy import array
+conf = SparkConf().setAppName("NaiveBayes")
+sc = SparkContext(conf=conf)
+
+# Create dataset path & output path.
+# These will be S3 bucket locations
+datasets_path = "s3a://msbatutorial/data"
+output_path = "s3a://msbatutorial/output"
+
+# Boston file
+file = os.path.join(datasets_path, 'boston50.txt')
+
+# Make RDD
+bostonRDD = sc.textFile(file)
+bostonRDD.cache()
+
+# Project boston data
+# Replace '\t' with ','
+new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
+
+# Split the data by
+def parsePoint(line):
+    values = [float(x) for x in line.split(",")]
+    return LabeledPoint(values[13], values[0:13])
+
+parsedData = new_b.map(parsePoint)
+
+# Split data approximately into training and test
+training_boston, test_boston = parsedData.randomSplit([0.6, 0.4])
+
+# Train a naive bayes model
+model_boston = NaiveBayes.train(training_boston, 1.0)
+
+# Make prediction and text accuracy
+predictionAndLabel_boston = test_boston.map(lambda p: (model_boston.predict(p.features), p.label))
+
+accuracy_boston = 1.0 * predictionAndLabel_boston.filter(lambda(x,v): x == v).count() /test_boston.count()
+
+# Print Model Accuracy
+print('..........................................................................................................')
+print('model accuracy: {}'.format(accuracy_boston))
+print('-----Finished NaiveBayes Model-----')
+print('..........................................................................................................')
+
+```
+
+### Second Classification Tutorial: Decision Trees Using Spark
 
 Code Description
 
-The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
+The second classificatier used in this tutorial is a Decision Tree model. The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
 
+> Import necessary libraries from spark. Set spark context.
 
 ```Python
 
@@ -348,20 +420,22 @@ sc = SparkContext(conf=conf)
 
 ```
 
+> Create paths from the S3 to call the data. The output_path is optional and can be used to write any files.
+> Replace "msbatutorial" with S3 bucket name and make sure the "boston.50.txt" is located in the data folder. Create the output folder if desired.
+
+
 ```Python
 
 #Set paths
 datasets_path = "s3a://msbatutorial/data"
 output_path = "s3a://msbatutorial/output"
 
-```
-
-```Python
-
-# Boston file
+#Load file based on paths
 file = os.path.join(datasets_path, 'boston50.txt')
 
 ```
+
+> Create an RDD from the loaded data
 
 ```Python
 
@@ -370,11 +444,15 @@ bostonRDD.cache()
 
 ```
 
+> The boston file is tab delimited. For this case, replace tab delimited with comma delimited.
+
 ```Python
 
 new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
 
 ```
+
+> Define a function to take in the data. This identifies the predictor and outcome variables in the data. If using "boston.txt" as the data, the 13th column is designated as the outcome variable.
 
 ```Python
 
@@ -382,13 +460,11 @@ def parsePoint(line):
 values = [float(x) for x in line.split(',')]
 return LabeledPoint(values[13], values[0:13])
 
-```
-
-```Python
-
 parsedData = new_b.map(parsePoint)
 
 ```
+
+> Separate the data into two sets. One will be used for the training of the model, the second will be used for the testing of the model accurracy.
 
 ```Python
 
@@ -397,12 +473,16 @@ training_boston, test_boston = parsedData.randomSplit([0.6, 0.4])
 
 ```
 
+> Call the DecisionTree.trainClassifier function.
+
 ```Python
 
 # Use the decision tree algorithm to fit a model
 model = DecisionTree.trainClassifier(training_boston, numClasses=2, categoricalFeaturesInfo={}, impurity='gini', maxDepth=5, maxBins=32)
 
 ```
+
+> Execute the prediction and return the classifications.
 
 ```Python
 
@@ -411,12 +491,16 @@ prediction = model.predict(training_boston.map(lambda x: x.features))
 
 ```
 
+> Combine the training data and the classifications for each row
+
 ```Python
 
 # Combine the original training data classification labels and the we predicted. 
 labelsAndPredictions = training_boston.map(lambda lp: lp.label).zip(prediction)
 
 ```
+
+> Compare the labels on the training data. The function .filter() will select the records that did not match, finding the error rate.
 
 ```Python
 
@@ -425,12 +509,18 @@ train_Err = labelsAndPredictions.filter(lambda (v, p): v != p).count()/float(tra
 
 ```
 
+> Print the training error to see how the model performs on the training data.
+
 ```Python
 
+print('..........................................................................................................')
 # Print Training Error
 print('Training error = ' + str(train_Err))
+print('..........................................................................................................')
 
 ```
+
+> Now test the model on the test data rather than the training data.
 
 ```Python
 
@@ -442,12 +532,16 @@ labelsAndPredictions_test = test_boston.map(lambda lp: lp.label).zip(prediction_
 
 ```
 
+> Compare the number of correct results with the total number of values. The output will then be what percentage of outcomes in the testing data have been predicted accurrately by the model.
+
 ```Python
 
 # Calculating the accuracy of the model on the observed data
 accuracy_boston = labelsAndPredictions_test.filter(lambda (v, p): v == p).count()/float(test_boston.count())
 
 ```
+
+> Print the model accurracy. Because of Spark's output, it is recommended to print something else that will help locate the result. The code below contains two strings of periods.
 
 ```Python
 
@@ -457,6 +551,75 @@ print('-----Finished Classifitation Tree Model-----') #We got .88
 print('..........................................................................................................')
 
 ```
+
+> This code can all be put together and saved as a .py file as well, and either run on a local machine or on a service such as Amazon Web Services. Below is the full code for treeModel.py
+
+```Python
+
+#Import necessary libraries
+import os
+from pyspark import SparkConf, SparkContext
+from pyspark.ml import Pipeline
+from pyspark.mllib.tree import DecisionTree, DecisionTreeModel
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.regression import LabeledPoint
+conf = SparkConf().setAppName("DecisionTree")
+sc = SparkContext(conf=conf)
+
+#Set paths
+datasets_path = "s3a://msbatutorial/data"
+output_path = "s3a://msbatutorial/output"
+
+#Load file based on paths
+file = os.path.join(datasets_path, 'boston50.txt')
+
+bostonRDD = sc.textFile(file)
+bostonRDD.cache()
+
+new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
+
+def parsePoint(line):
+values = [float(x) for x in line.split(',')]
+return LabeledPoint(values[13], values[0:13])
+
+parsedData = new_b.map(parsePoint)
+
+# Split data approximately into training and test
+training_boston, test_boston = parsedData.randomSplit([0.6, 0.4])
+
+# Use the decision tree algorithm to fit a model
+model = DecisionTree.trainClassifier(training_boston, numClasses=2, categoricalFeaturesInfo={}, impurity='gini', maxDepth=5, maxBins=32)
+
+# Use the model we got from last step, we do the perdiction on each records and get their classifications.
+prediction = model.predict(training_boston.map(lambda x: x.features))
+
+# Combine the original training data classification labels and the we predicted. 
+labelsAndPredictions = training_boston.map(lambda lp: lp.label).zip(prediction)
+
+# Comparing these two labels and geting the error rate.
+train_Err = labelsAndPredictions.filter(lambda (v, p): v != p).count()/float(training_boston.count())
+
+print('..........................................................................................................')
+# Print Training Error
+print('Training error = ' + str(train_Err))
+print('..........................................................................................................')
+
+# Tests the predictions from the model
+prediction_test = model.predict(test_boston.map(lambda x: x.features))
+
+# Tests labels & predictions
+labelsAndPredictions_test = test_boston.map(lambda lp: lp.label).zip(prediction_test)
+
+# Calculating the accuracy of the model on the observed data
+accuracy_boston = labelsAndPredictions_test.filter(lambda (v, p): v == p).count()/float(test_boston.count())
+
+print('..........................................................................................................')
+print('model accuracy: {}'.format(accuracy_boston))
+print('-----Finished Classifitation Tree Model-----') #We got .88
+print('..........................................................................................................')
+
+```
+
 
 
 ## Fourth Tutorial: Guassian Mixture Modeling
