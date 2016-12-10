@@ -19,7 +19,23 @@ For the sake of simplicity, we have broken this into three parts: In Section 1.1
 
 ### 1.1 The Engine
 
-Description comes here.
+We will refer to the part that exclusively deals with training and providing recommendations by using Spark MLib as the engine. Before delving into how the engine is constructed, we need to be familiar with a few terminologies:
+  
+  **_Collaborative Filtering_** : A set of technologies that predict which items in a set of products (or information) a particular customer will like based on the preferences of lots of other people i.e. If I know your movie preferences, and those of lots of other people, I can make pretty good movie recommendations for you. [1]
+
+  An obvious idea would be to look at a user's preferences and those in his *neighbourhood* of people and use the ratings given by these people to recommend new movies to our user. In fact, it was this idea on which most of the early recommendation algorithms were based upon. Over time people have developed more sophisticated ways of computing essentially the same thing. One of these is the Alternating Least Squares method.
+
+  **_ALS_** : The idea behind ALS is that instead of building a list of neighbors for you, we use everyone’s ratings to form some type of intermediate representation of movie tastes — something like a taste space in which we can place you, and the movies — and then then use that representation to quickly evaluate movies to see if they match this community-based representation of your tastes. This taste space is called latent factors. [2]
+
+
+The engine will have the foloowing five major tasks:
+
+  1. Training the ALS model
+  2. Predict ratings for a given movie for a user
+  3. Get the top n rated movies for a user
+  4. Add the ratings for a new user
+
+
 
 
 ###### Figure 1: Code for XX
@@ -294,6 +310,7 @@ new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
 > Define a function to take in the data. This identifies the predictor and outcome variables in the data. If using "boston.txt" as the data, the 13th column is designated as the outcome variable.
 - The function parsePoint takes in an array and creates float values for each comma separated value. Then calls the LabeledPoint function to define one point as the outcome variable.
 - parsePoint() is then called using the map function, and is applied to each row in the selected RDD
+
 ```Python
 
 def parsePoint(line):
@@ -306,7 +323,8 @@ parsedData = new_b.map(parsePoint)
 
 > Split the data into a training set and a test set. The results of the model on the training set will be tested on the test set. Then call the NaiveBayes.train() function to train the data.
 - NaiveBayes.train() allows for an optional smoothing parameter.
-- NaiveBayes.train() also allows for model type parameter. The default type is 'multinomial'. The other options are 
+- NaiveBayes.train() also allows for model type parameter. The default type is 'multinomial'.
+
 ```Python
 
 # Split data approximately into training and test
@@ -886,7 +904,7 @@ datasets_path = "s3a://bigdataweberproject"
 data_file = os.path.join(datasets_path,'snoq.csv')
 rainfallData = sc.textFile(data_file)
 
-formattedRainfallData = rainfallData.map(lambda line: [float(x) for x in line.strip().split(',')]
+formattedRainfallData = rainfallData.map(lambda line: [float(x) for x in line.strip().split(',')])
 
 gmm_model_rainfall_2 = GaussianMixture.train(formattedRainfallData, 2)
 gmm_model_rainfall_3 = GaussianMixture.train(formattedRainfallData, 3)
@@ -901,3 +919,9 @@ print("weight = ", gmm_model_rainfall_3.weights[i], "mu = ", gmm_model_rainfall_
 
 
 ```
+
+
+References
+
+1. [Joseph Konstan's answer to "What is collaborative filtering in layman's terms?"](http://qr.ae/THH9O0)
+2. [Koren, Yehuda, Robert Bell, and Chris Volinsky. "Matrix factorization techniques for recommender systems." Computer 42, no. 8 (2009): 30-37.](https://datajobs.com/data-science-repo/Recommender-Systems-[Netflix].pdf)

@@ -15,11 +15,26 @@ Some Description
 
 In this tutorial we will learn how to use the Spark machine learning library Mlib to build a movie recommendation engine. Not only this, we will take our engine live by hosting it as a web service on AWS. For this tutorial, we use the popular MovieLens data set. A description of this dataset can be found at the Grouplens [website](http://grouplens.org/datasets/movielens/latest/).
 
+
 For the sake of simplicity, we have broken this into three parts: In Section 1.1 we will walk through the code for our recomendation engine. In Section 1.2 we will talk about exposing the engine utilies as web service. In Section 1.3, we will see how to access this service in real-time by hosting it on AWS.
 
 ### 1.1 The Engine
 
-Description comes here.
+We will refer to the part that exclusively deals with training and providing recommendations by using Spark MLib as the engine. Before delving into how the engine is constructed, we need to be familiar with a few terminologies:
+  
+  **_Collaborative Filtering_** : A set of technologies that predict which items in a set of products (or information) a particular customer will like based on the preferences of lots of other people i.e. If I know your movie preferences, and those of lots of other people, I can make pretty good movie recommendations for you. [1]
+
+  An obvious idea would be to look at a user's preferences and those in his *neighbourhood* of people and use the ratings given by these people to recommend new movies to our user. In fact, it was this idea on which most of the early recommendation algorithms were based upon. Over time people have developed more sophisticated ways of computing essentially the same thing. One of these is the Alternating Least Squares method.
+
+  **_ALS_** : The idea behind ALS is that instead of building a list of neighbors for you, we use everyone’s ratings to form some type of intermediate representation of movie tastes — something like a taste space in which we can place you, and the movies — and then then use that representation to quickly evaluate movies to see if they match this community-based representation of your tastes. This taste space is called latent factors. [2]
+
+
+The engine will have the foloowing five major tasks:
+
+  1. Training the ALS model
+  2. Predict ratings for a given movie for a user
+  3. Get the top n rated movies for a user
+  4. Add the ratings for a new user
 
 
 ###### Figure 1: Code for XX
@@ -531,3 +546,9 @@ for i in range(2):
     "sigma = ", gmm_model_rainfall_3.gaussians[i].sigma.toArray())
 
 ```
+
+References
+
+1. [Joseph Konstan's answer to "What is collaborative filtering in layman's terms?"](http://qr.ae/THH9O0)
+2. [Koren, Yehuda, Robert Bell, and Chris Volinsky. "Matrix factorization techniques for recommender systems." Computer 42, no. 8 (2009): 30-37.](https://datajobs.com/data-science-repo/Recommender-Systems-[Netflix].pdf)
+
