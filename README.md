@@ -595,7 +595,6 @@ print('.........................................................................
 
 ## Tutorial 3: Classification Using Decision
 
-Code Description
 
 The second classifier used in this tutorial is a Decision Tree model. The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
 
