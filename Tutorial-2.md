@@ -116,6 +116,29 @@ user_unrated_movies_RDD = self.ratings_RDD.filter(lambda rating: not rating[0] =
 ratings = self.__predict_ratings(user_unrated_movies_RDD).filter(lambda r: r[2]>=25).takeOrdered(movies_count, key=lambda x: -x[1])
 ```
 
+
+where the predict_ratings method takes a (userID, movieID) formatted RDD and returns an RDD with format (movieTitle, movieRating, numRatings) as shown below:
+
+```Python
+def __predict_ratings(self, user_and_movie_RDD):
+        predicted_RDD = self.model.predictAll(user_and_movie_RDD)
+        predicted_rating_RDD = predicted_RDD.map(lambda x: (x.product, x.rating))
+        predicted_rating_title_and_count_RDD = \
+            predicted_rating_RDD.join(self.movies_titles_RDD).join(self.movies_rating_counts_RDD)
+        predicted_rating_title_and_count_RDD = \
+            predicted_rating_title_and_count_RDD.map(lambda r: (r[1][0][1], r[1][0][0], r[1][1]))
+        
+        return predicted_rating_title_and_count_RDD
+```
+
+The final output will be of the form :
+
+```
+    (u'Band of Brothers (2001)', 8.225114960311624, 4450)
+    (u'Generation Kill (2008)', 8.206487040524653, 52)
+    (u"Schindler's List (1993)", 8.172761674773625, 53609)
+```
+
 ### 1.2 The Engine as a service
 
 
