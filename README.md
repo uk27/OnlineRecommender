@@ -29,7 +29,7 @@ We will refer to the part that exclusively deals with training and providing rec
   **_ALS_** : The idea behind ALS is that instead of building a list of neighbors for you, we use everyone’s ratings to form some type of intermediate representation of movie tastes — something like a taste space in which we can place you, and the movies — and then then use that representation to quickly evaluate movies to see if they match this community-based representation of your tastes. This taste space is called latent factors. [2]
 
 
-The engine will have the foloowing five major tasks:
+The engine will have the following five major tasks:
 
   1. Training the ALS model
   2. Predict ratings for a given movie for a user

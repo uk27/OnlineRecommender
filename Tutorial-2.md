@@ -28,29 +28,93 @@ We will refer to the part that exclusively deals with training and providing rec
   **_ALS_** : The idea behind ALS is that instead of building a list of neighbors for you, we use everyone’s ratings to form some type of intermediate representation of movie tastes — something like a taste space in which we can place you, and the movies — and then then use that representation to quickly evaluate movies to see if they match this community-based representation of your tastes. This taste space is called latent factors. [2]
 
 
-The engine will have the foloowing five major tasks:
-
+The engine will have the following four major tasks:
+	
   1. Training the ALS model
   2. Predict ratings for a given movie for a user
   3. Get the top n rated movies for a user
   4. Add the ratings for a new user
 
+Given that the functionalities of the engine can be broken down into separate steps, it makes sense that we define the engine as a class and put these functionalities as separate methods of that class. 
+In the following code we will define the Recommendation engine and initialize the common variables that will be used by all the methods. 
 
-
-
-###### Figure 1: Code for XX
 ```Python
+class RecommendationEngine:
 
-#Python Code comes here
-def doSomething():
-  #line 1
-  #line 2
-  return 
+	def __init__(self, sc, dataset_path):
+
+        """Init the recommendation engine given a Spark context and a dataset path
+        """
+
+        logger.info("Starting up the Recommendation Engine: ")
+
+        self.sc = sc
+
+        # Load ratings data for later use
+        logger.info("Loading Ratings data...")
+        ratings_file_path = os.path.join(dataset_path, 'ratings.csv')
+        ratings_raw_RDD = self.sc.textFile(ratings_file_path)
+        ratings_raw_data_header = ratings_raw_RDD.take(1)[0]
+        self.ratings_RDD = ratings_raw_RDD.filter(lambda line: line!=ratings_raw_data_header)\
+            .map(lambda line: line.split(",")).map(lambda tokens: (int(tokens[0]),int(tokens[1]),float(tokens[2]))).cache()
+        # Load movies data for later use
+        logger.info("Loading Movies data...")
+        movies_file_path = os.path.join(dataset_path, 'movies.csv')
+        movies_raw_RDD = self.sc.textFile(movies_file_path)
+        movies_raw_data_header = movies_raw_RDD.take(1)[0]
+        self.movies_RDD = movies_raw_RDD.filter(lambda line: line!=movies_raw_data_header)\
+            .map(lambda line: line.split(",")).map(lambda tokens: (int(tokens[0]),tokens[1],tokens[2])).cache()
+        self.movies_titles_RDD = self.movies_RDD.map(lambda x: (int(x[0]),x[1])).cache()
+        # Pre-calculate movies ratings counts
+        self.__count_and_average_ratings()
 
 ```
 
-Code Description
+The __init__ method above can be thought of as Python's counterpart to C++ or Java Style Constructors. Both C++ and Java by default pass the reference to an object as a hidden parameter and access it within the class using *this* keyword. However in python, we need to explicitly define it and refer to it using *self*. The subsequent lines of code  simply load the data from the ratings.csv and movies.csv files and store them into ratings_RDD and movies_RDD respectivey after performing the nescessary typecasting. We also pass sc so that methods of this class can perform Spark operations. The dataset_path is the path to our *S3 bucket* where we have stored all the data.
 
+In addition, we need to initialize the paramters for the ALS algorithm and perform the model training. These lines are added into the same __init__ method. 
+
+```Python
+# Train the model
+self.rank = 8
+self.seed = 5
+self.iterations = 10
+self.regularization_parameter = 0.1
+self.__train_model() 
+ ``` 
+
+Now we will look at each of the functions in detail.
+
+####1.1.1 Training
+
+This is where we see the magic of MLib at work. The library takes care of implementing the complex algorithm once we specify it's required parameters using it's easy to understand interface.
+
+```Python
+self.model = ALS.train(self.ratings_RDD, self.rank, seed=self.seed, \
+                               iterations=self.iterations, lambda_=self.regularization_parameter)
+logger.info("ALS model built!")
+```
+
+The ALS.train() takes the paramteres that we initialized in the __init__ method, trains the model and stores it in the class variable model. Now we can get some recommendations. To ensure better results, we will only recommend to a user, the movies which have more than a minimum number of ratings given by other people. For this, we need to count the number of ratings per movie. This can be done as follows:
+
+```Python
+movie_ID_with_ratings_RDD = self.ratings_RDD.map(lambda x: (x[1], x[2])).groupByKey()
+movie_ID_with_avg_ratings_RDD = movie_ID_with_ratings_RDD.map(get_counts_and_averages)
+self.movies_rating_counts_RDD = movie_ID_with_avg_ratings_RDD.map(lambda x: (x[0], x[1][0]))
+```
+where get_counts_and_averages is a helper function that takes a tuple (movieID, ratings_iterable) and returns (movieID, (ratings_count, ratings_avg))
+
+
+####1.1.2 Getting Recommendations
+
+To get recommendations, we first need all the movies the new user hasn't rated yet. We will then use our model on this data to predict ratings.
+
+```Python
+user_unrated_movies_RDD = self.ratings_RDD.filter(lambda rating: not rating[0] == user_id)\
+                                                 .map(lambda x: (user_id, x[1])).distinct()
+# Get predicted ratings
+ratings = self.__predict_ratings(user_unrated_movies_RDD).filter(lambda r: r[2]>=25).takeOrdered(movies_count, key=lambda x: -x[1])
+```
 
 ### 1.2 The Engine as a service
 
@@ -260,44 +324,81 @@ Hosting the service on AWS might appear to be a complicated process if you are d
 ##Classification Tutorials: Second & Third Tutorials
 This pair of tutorials will go through two separate classification systems and evaluate the model for each, comparing the results on one set of data. Classifiers take predictor variables and outcome variables specified by the user, and return a system for predicting future outcomes with those predictor variables.
 
+
 ## First Classification Tutorial: Naive Bayes Model
 
 Naive Bayes is the first model used in this tutorial. It is a simple technique for constructing classifiers: models that assign class labels to problem instances, represented as vectors of feature values, where the class labels are drawn from some finite set. It is not a single algorithm for training such classifiers, but a family of algorithms based on a common principle: all naive Bayes classifiers assume that the value of a particular feature is independent of the value of any other feature, given the class variable.
 
-> Import any necessary libraries. Set spark context.
+Please note that one aspect of the tutorial setup is devoted to setting up your local machine to run the program, and one aspect is set up for running on Amazon Web Services. They require different libraries, and Spark Context does not need to be set if using in pyspark, only on AWS.
+
+> AWS SETUP:
+- This section is used if you are setting up the file to run on Amazon Web Services
+- If you are running the local machine, skip to Step 1b
+- Make sure you replace the datasets path with the  S3 path where the file is located
+
+> This block of code imports the necessary libraries, locates the file, and creates an RDD from the data.
 
 ```Python
-#Import any necessary libraries
+
+# Begin Step 1a
+# Use Step 1a if you are setting up a .py file to run on Amazon Web Services (AWS)...
+# Import Relevant Libraries
 import os
 from pyspark import SparkConf, SparkContext
 from pyspark.mllib.classification import NaiveBayes, NaiveBayesModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.regression import LabeledPoint
 from numpy import array
+
+#Spark context needs to be created.
 conf = SparkConf().setAppName("NaiveBayes")
 sc = SparkContext(conf=conf)
-```
 
-> Create paths from the S3 to call the data. The output_path is optional and can be used to write any files.
-> Replace "msbatutorial" with S3 bucket name and make sure the "boston.50.txt" is located in the data folder. Create the output folder if desired.
-
-```Python
-
+# Create dataset path & output path.
+# These will be S3 bucket locations
 datasets_path = "s3a://msbatutorial/data"
 output_path = "s3a://msbatutorial/output"
 
-file = os.path.join(datasets_path, 'boston50.txt')
+# Boston file
+filepath = os.path.join(datasets_path, 'boston50.txt')
+
+# Make RDD
+bostonRDD = sc.textFile(file)
+bostonRDD.cache()
+# End Step 1a
 
 ```
 
-> Create an RDD from the loaded data
+> LOCAL MACHINE SETUP:
+- This section is used if you are setting up the file to run on Amazon Web Services
+- If you set up your files to run on AWS, skip this section
+- Make sure you replace the datasets path with the local path where the file is located
+
+> This block of code imports the necessary libraries, locates the file, and creates an RDD from the data.
 
 ```Python
 
-bostonRDD = sc.textFile(file)
-bostonRDD.cache()
+# Begin step 1b
+# Use Step 1b if you are setting up your local machine to run the model
+# Import Relevant Libraries
+from pyspark import SparkConf, SparkContext
+from pyspark.mllib.classification import NaiveBayes, NaiveBayesModel
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.regression import LabeledPoint
+from numpy import array
 
-```
+#Spark context only needs to be called
+sc
+
+# Write the absolute path for the file you wish to use
+filepath = "file:/home/training/training_materials/data/boston50.txt"
+bostonRDD = sc.textFile(filepath)
+bostonRDD.cache
+# End step 1b
+
+
+
+All code below will be used on both AWS and your local machine.
 
 > The boston file is tab delimited. For this case, replace tab delimited with comma delimited.
 
@@ -355,7 +456,7 @@ accuracy_boston = 1.0 * predictionAndLabel_boston.filter(lambda(x,v): x == v).co
 # Print Model Accuracy
 print('..........................................................................................................')
 print('model accuracy: {}'.format(accuracy_boston))
-print('-----Finished NaiveBayes Model-----') #Original result: 0.74 or 74% accurracy
+print('-----Finished NaiveBayes Model-----')
 print('..........................................................................................................')
 
 ```
@@ -422,45 +523,77 @@ Code Description
 
 The second classificatier used in this tutorial is a Decision Tree model. The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
 
-> Import necessary libraries from spark. Set spark context.
+> AWS SETUP:
+- This section is used if you are setting up the file to run on Amazon Web Services
+- If you are running the local machine, skip to Step 1b
+- Make sure you replace the datasets path with the  S3 path where the file is located
+
+> This block of code imports the necessary libraries, locates the file, and creates an RDD from the data.
 
 ```Python
 
-#Import necessary libraries
+# Begin Step 1a
+# Use Step 1a if you are setting up a .py file to run on Amazon Web Services (AWS)...
+# Import Relevant Libraries
 import os
 from pyspark import SparkConf, SparkContext
 from pyspark.ml import Pipeline
 from pyspark.mllib.tree import DecisionTree, DecisionTreeModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.regression import LabeledPoint
-conf = SparkConf().setAppName("DecisionTree")
+from numpy import array
+
+#Spark context needs to be created.
+conf = SparkConf().setAppName("NaiveBayes")
 sc = SparkContext(conf=conf)
 
-```
-
-> Create paths from the S3 to call the data. The output_path is optional and can be used to write any files.
-> Replace "msbatutorial" with S3 bucket name and make sure the "boston.50.txt" is located in the data folder. Create the output folder if desired.
-
-
-```Python
-
-#Set paths
+# Create dataset path & output path.
+# These will be S3 bucket locations
 datasets_path = "s3a://msbatutorial/data"
 output_path = "s3a://msbatutorial/output"
 
-#Load file based on paths
-file = os.path.join(datasets_path, 'boston50.txt')
+# Boston file
+filepath = os.path.join(datasets_path, 'boston50.txt')
+
+# Make RDD
+bostonRDD = sc.textFile(file)
+bostonRDD.cache()
+# End Step 1a
+
 
 ```
 
-> Create an RDD from the loaded data
+> LOCAL MACHINE SETUP:
+- This section is used if you are setting up the file to run on Amazon Web Services
+- If you set up your files to run on AWS, skip this section
+- Make sure you replace the datasets path with the local path where the file is located
+
+> This block of code imports the necessary libraries, locates the file, and creates an RDD from the data.
 
 ```Python
 
-bostonRDD = sc.textFile(file)
-bostonRDD.cache()
+# Begin Step 1b
+# Use Step 1b if you are setting up your local machine to run the model
+# Import Relevant Libraries
+from pyspark import SparkConf, SparkContext
+from pyspark.ml import Pipeline
+from pyspark.mllib.tree import DecisionTree, DecisionTreeModel
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.regression import LabeledPoint
+from numpy import array
+
+#Spark context only needs to be called
+sc
+
+# Write the absolute path for the file you wish to use
+filepath = "file:/home/training/training_materials/data/boston50.txt"
+bostonRDD = sc.textFile(filepath)
+bostonRDD.cache
+# End Step 1b
 
 ```
+
+All code below will be used on both AWS and your local machine.
 
 > The boston file is tab delimited. For this case, replace tab delimited with comma delimited.
 
@@ -565,7 +698,7 @@ accuracy_boston = labelsAndPredictions_test.filter(lambda (v, p): v == p).count(
 
 print('..........................................................................................................')
 print('model accuracy: {}'.format(accuracy_boston))
-print('-----Finished Classifitation Tree Model-----') #We got .88
+print('-----Finished Classifitation Tree Model-----')
 print('..........................................................................................................')
 
 ```
@@ -574,31 +707,59 @@ print('.........................................................................
 
 ```Python
 
-#Import necessary libraries
+# Begin Step 1a
+# Use Step 1a if you are setting up a .py file to run on Amazon Web Services (AWS)...
+# Import Relevant Libraries
 import os
 from pyspark import SparkConf, SparkContext
 from pyspark.ml import Pipeline
 from pyspark.mllib.tree import DecisionTree, DecisionTreeModel
 from pyspark.mllib.util import MLUtils
 from pyspark.mllib.regression import LabeledPoint
-conf = SparkConf().setAppName("DecisionTree")
+from numpy import array
+
+#Spark context needs to be created.
+conf = SparkConf().setAppName("NaiveBayes")
 sc = SparkContext(conf=conf)
 
-#Set paths
+# Create dataset path & output path.
+# These will be S3 bucket locations
 datasets_path = "s3a://msbatutorial/data"
 output_path = "s3a://msbatutorial/output"
 
-#Load file based on paths
-file = os.path.join(datasets_path, 'boston50.txt')
+# Boston file
+filepath = os.path.join(datasets_path, 'boston50.txt')
 
+# Make RDD
 bostonRDD = sc.textFile(file)
 bostonRDD.cache()
+# End Step 1a
 
+# Begin Step 1b
+# Use Step 1b if you are setting up your local machine to run the model
+# Import Relevant Libraries
+from pyspark import SparkConf, SparkContext
+from pyspark.ml import Pipeline
+from pyspark.mllib.tree import DecisionTree, DecisionTreeModel
+from pyspark.mllib.util import MLUtils
+from pyspark.mllib.regression import LabeledPoint
+from numpy import array
+
+#Spark context only needs to be called
+sc
+
+# Write the absolute path for the file you wish to use
+filepath = "file:/home/training/training_materials/data/boston50.txt"
+bostonRDD = sc.textFile(filepath)
+bostonRDD.cache
+# End Step 1b
+
+# Replace '\t' with ',' to create a comma separated dataset
 new_b = bostonRDD.map(lambda line: line.replace("\t", ","))
 
 def parsePoint(line):
-values = [float(x) for x in line.split(',')]
-return LabeledPoint(values[13], values[0:13])
+    values = [float(x) for x in line.split(',')]
+    return LabeledPoint(values[13], values[0:13])
 
 parsedData = new_b.map(parsePoint)
 
@@ -633,7 +794,7 @@ accuracy_boston = labelsAndPredictions_test.filter(lambda (v, p): v == p).count(
 
 print('..........................................................................................................')
 print('model accuracy: {}'.format(accuracy_boston))
-print('-----Finished Classifitation Tree Model-----') #We got .88
+print('-----Finished Classifitation Tree Model-----')
 print('..........................................................................................................')
 
 ```
@@ -842,7 +1003,7 @@ import os
 from pyspark import SparkConf, SparkContext
 from pyspark.mllib.clustering import GaussianMixture, GaussianMixtureModel
 
-conf = SparkConf().setAppName("Gaussian Mixture Modeling Faithful Data")
+conf = SparkConf().setAppName("Gaussian Mixture Modeling Rainfall Data")
 sc = SparkContext(conf=conf)
 
 ```
