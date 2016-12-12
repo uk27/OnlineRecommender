@@ -6,10 +6,11 @@
 - Eric Passe
 - Yuemin Xu
 
-#### Topic
-> Overall Problem Statement
 
-Some Description
+##Intoduction
+
+In this sequence of tutorials, we will talk about how Spark MLib can be used to implement multiple machine learning algorithms. We will also talk about ways of how these implementations can be used as interesting real-time applications by employing state-of-the-art technologies. 
+
 
 ## Tutorial 1:  Online Recommendation Engine
 
