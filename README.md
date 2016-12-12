@@ -6,7 +6,6 @@
 - Eric Passe
 - Yuemin Xu
 
-
 ##Intoduction
 
 In this sequence of tutorials, we will talk about how Spark MLib can be used to implement multiple machine learning algorithms. We will also talk about ways of how these implementations can be used as interesting real-time applications by employing state-of-the-art technologies. 
@@ -594,11 +593,11 @@ print('.........................................................................
 
 ```
 
-### Tutorial 3: Classification Using Decision
+## Tutorial 3: Classification Using Decision
 
 Code Description
 
-The second classificatier used in this tutorial is a Decision Tree model. The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
+The second classifier used in this tutorial is a Decision Tree model. The decision tree is a greedy algorithm that performs a recursive binary partitioning of the feature space. The tree predicts the same label for each bottommost (leaf) partition. Each partition is chosen greedily by selecting the best split from a set of possible splits, in order to maximize the information gain at a tree node. In other words, the split chosen at each tree node is chosen from the set argmax s IG(D,s) where IG(D,s) is the information gain when a split ss is applied to a dataset D.
 
 > AWS SETUP:
 - This section is used if you are setting up the file to run on Amazon Web Services
@@ -878,7 +877,7 @@ print('.........................................................................
 
 
 
-## Fourth Tutorial: Guassian Mixture Modeling
+## Tutorial 4: Guassian Mixture Modeling
 
 > The purpose of this tutorial is to use Spark to identify "hidden" distributions that make up the overall distribution of data present. Gaussian Mixture Modeling is a process quite similar to k-means clustering in that it produces random parameter estimates of a given number of underlying normal distributions that comprise the distribution of the data observed.
 
@@ -887,7 +886,7 @@ print('.........................................................................
 > If you are familiar with k-means, this algorithm is not a huge step. Instead of using hard assignments to clusters, we now use soft assignment, where each point has a probability of belonging to a particular cluster. As with most algorithms, there are some key assumptions that must be met. First, the dataset should be Gaussian. What happens when this assumption is not met? If the number of clusters is known in advance, the algorithm is not guaranteed to find the "right" clusters. If the number of clusters is unknown, this actually is a bit better! If those clusters have a normal distribution then an information criterion is typically good enough to find the best solution. Second, the cluster sizes must be relatively close to each other. If the clusters are not the same size, a larger cluster will show up as more important than any smaller cluster.
 
 
-## 4.1 Introduction to GMM Using Spark
+### 4.1 Introduction to GMM Using Spark
 
 > SparkMLLib contains a number of powerful methods for implementing algorithms that use Expectation Maximization, both for k-means and Gaussian Mixture Modeling. The following example builds on an example dataset provided by Spark and saved for you as "gmm_data.txt". 
 
